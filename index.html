@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تست کریپتوآرت - آپلود و انکریپت</title>
+  <style>
+    body{font-family:Tahoma;background:#000;color:#0ff;padding:50px;text-align:center;}
+    input, button{padding:15px;font-size:18px;margin:10px;border-radius:12px;}
+    #result{margin-top:30px;font-size:20px;}
+  </style>
+</head>
+<body>
+  <h1>تست گالری خصوصی (فقط برای احمدجوان)</h1>
+  <p>فایل(های) زیر ۱۰۰ کیلوبایت + رمز دلخواه</p>
+  
+  <input type="file" id="files" multiple><br>
+  <input type="password" id="pass" placeholder="رمز دلخواه" style="width:300px"><br>
+  <button onclick="upload()">شروع انکریپت و آپلود به Arweave</button>
+  
+  <div id="result"></div>
+
+  <script>
+  async function upload() {
+    const files = document.getElementById('files').files;
+    const pass = document.getElementById('pass').value;
+    if (!files.length || !pass) return alert("فایل و رمز را وارد کن");
+    
+    const form = new FormData();
+    for (let file of files) form.append('files', file);
+    form.append('password', pass);
+    
+    document.getElementById('result').innerHTML = 'در حال انکریپت و آپلود...';
+    
+    const res = await fetch('https://ahmadjavan-cryptoart.vercel.app/api/upload', {
+      method: 'POST',
+      body: form
+    });
+    const data = await res.json();
+    
+    document.getElementById('result').innerHTML = `
+      <p>گالری انکریپت‌شده (دائمی):</p>
+      <a href="${data.encrypted}" target="_blank">${data.encrypted}</a>
+      <br><br>
+      <p>لینک دیکریپتر آماده:</p>
+      <a href="https://ahmadjavan.ir/decryptor.html?tx=${data.tx}" target="_blank">باز کردن گالری خصوصی</a>
+    `;
+  }
+  </script>
+</body>
+</html>
