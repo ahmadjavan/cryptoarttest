@@ -1,0 +1,46 @@
+name: آپلود و انکریپرکت به Arweave
+
+on:
+  workflow_dispatch:        # این یعنی دستی اجرا می‌شه (ساده‌تر برای تست)
+
+jobs:
+  test-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: نصب کتابخانه
+        run: npm init -y && npm install arweave crypto-js
+
+      - name: تست آپلود با کیف تو
+        env:
+          WALLET: ${{ secrets.ARWEAVE_WALLET }}
+        run: |
+          cat > test.js << 'EOF'
+          const Arweave = require('arweave');
+          const CryptoJS = require('crypto-js');
+          const arweave = Arweave.init({});
+          const wallet = JSON.parse(process.env.WALLET);
+
+          const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>تست احمدجوان</title></head><body style="background:#000;color:#0f0;text-align:center;padding:50px;font-size:30px;"><h1>تست موفق از کیف پول خود احمدجوان!</h1><p>رمز: 1234</p></body></html>`;
+
+          const encrypted = CryptoJS.AES.encrypt(html, "1234").toString();
+
+          (async () => {
+            const tx = await arweave.createTransaction({ data: encrypted }, wallet);
+            await arweave.transactions.sign(tx, wallet);
+            await arweave.transactions.post(tx);
+            console.log("لینک گالری انکریپت‌شده:");
+            console.log("https://arweave.net/" + tx.id);
+            console.log("لینک دیکریپتر:");
+            console.log("https://ahmadjavan.ir/decryptor.html?tx=" + tx.id);
+          })();
+          EOF
+
+          node test.js
