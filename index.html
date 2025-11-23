@@ -3,44 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>جمع‌آوری گالری</title>
+  <title>آپلود گالری خصوصی</title>
   <style>
     body{background:#000;color:#0ff;font-family:Tahoma;text-align:center;padding:50px;}
-    input,button,textarea{padding:15px;margin:10px;font-size:18px;border-radius:12px;}
+    input,button{padding:15px;margin:10px;font-size:18px;border-radius:12px;}
     button{background:#0066ff;color:#fff;cursor:pointer;}
-    textarea{width:90%;height:200px;background:#111;color:#0f0;}
+    #status{color:#ff0;font-size:22px;margin:30px;}
   </style>
 </head>
 <body>
-  <h1>گالری خصوصی — فقط برای جمع‌آوری فایل</h1>
+  <h1>آپلود گالری خصوصی به Arweave</h1>
+  <p>عکس‌ها + رمز → لینک دائمی (خودکار)</p>
   <input type="file" id="files" multiple accept="image/*"><br>
-  <input type="password" id="pass" placeholder="رمز دلخواه مشتری"><br>
-  <button onclick="generate()">تولید اطلاعات برای آپلود</button>
-  <textarea id="output" placeholder="اینجا کپی کن و بفرست برام"></textarea>
+  <input type="password" id="pass" placeholder="رمز دلخواه"><br>
+  <button onclick="upload()">آپلود کن</button>
+  <div id="status">آماده</div>
 
   <script>
-  async function generate() {
+  async function upload() {
     const files = document.getElementById('files').files;
     const pass = document.getElementById('pass').value.trim();
-    if (!files.length || !pass) return alert("فایل و رمز رو بزن!");
+    const status = document.getElementById('status');
+    
+    if (!files.length || pass.length < 4) {
+      status.innerHTML = "فایل و رمز رو وارد کن!";
+      return;
+    }
 
-    const data = [];
+    status.innerHTML = "در حال آپلود...";
+
+    const fileData = [];
     for (let file of files) {
       const base64 = await new Promise(r => {
         const reader = new FileReader();
         reader.onload = () => r(reader.result.split(',')[1]);
         reader.readAsDataURL(file);
       });
-      data.push({ name: file.name, data: base64, type: file.type });
+      fileData.push({ name: file.name, data: base64, type: file.type });
     }
 
-    const result = {
-      password: pass,
-      files: data
-    };
-
-    document.getElementById('output').value = JSON.stringify(result, null, 2);
-    alert("کپی کن و بفرست برام تا آپلود کنم!");
+    try {
+const res = await fetch("https://cryptoart-trigger.ahmadjavan6.workers.dev", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ password: pass, files: fileData })
+});
+      if (res.ok) {
+        status.innerHTML = "<span style='color:lime'>آپلود شد!<br>برو تب Actions و لینک دائمی رو ببین</span>";
+      } else {
+        const err = await res.json();
+        status.innerHTML = "<span style='color:red'>خطا: " + err.error + "</span>";
+      }
+    } catch (e) {
+      status.innerHTML = "<span style='color:red'>خطا در ارتباط</span>";
+    }
   }
   </script>
 </body>
