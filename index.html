@@ -5,58 +5,68 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>آپلود گالری خصوصی</title>
   <style>
-    body{background:#000;color:#0ff;font-family:Tahoma;text-align:center;padding:50px;}
-    input,button{padding:15px;margin:10px;font-size:18px;border-radius:12px;}
+    body{background:#000;color:#0ff;font-family:Tahoma;text-align:center;padding:80px 20px;}
+    input,button{padding:15px;margin:10px;font-size:18px;border-radius:12px;border:none;}
     button{background:#0066ff;color:#fff;cursor:pointer;}
-    #status{color:#ff0;font-size:22px;margin:30px;}
+    #status{color:#ff0;font-size:22px;margin:30px;min-height:60px;}
   </style>
 </head>
 <body>
   <h1>آپلود گالری خصوصی به Arweave</h1>
+  <p>چند تا عکس انتخاب کن + یه رمز بزن + دکمه رو بزن</p>
+  
   <input type="file" id="files" multiple accept="image/*"><br>
-  <input type="password" id="pass" placeholder="رمز دلخواه"><br>
-  <button onclick="upload()">آپلود کن</button>
-  <div id="status">در انتظار...</div>
+  <input type="password" id="pass" placeholder="رمز دلخواه (حداقل ۴ کاراکتر)"><br>
+  <button onclick="upload()">آپلود و ساخت گالری دائمی</button>
+  
+  <div id="status">آماده برای آپلود</div>
 
   <script>
   async function upload() {
     const files = document.getElementById('files').files;
     const pass = document.getElementById('pass').value.trim();
     const status = document.getElementById('status');
-
+    
     if (!files.length || pass.length < 4) {
-      status.textContent = "فایل و رمز رو وارد کن!";
+      status.innerHTML = "<span style='color:#f66'>فایل و رمز رو درست وارد کن!</span>";
       return;
     }
 
-    status.textContent = "در حال ارسال...";
+    status.innerHTML = "در حال ارسال به GitHub... (چند ثانیه صبر کن)";
 
-    const formData = new FormData();
-    formData.append('password', pass);
-
+    const fileData = [];
     for (let file of files) {
-      const base64 = await new Promise(r => {
+      const base64 = await new Promise(resolve => {
         const reader = new FileReader();
-        reader.onload = () => r(reader.result);
+        reader.onload = () => resolve(reader.result.split(',')[1]);
         reader.readAsDataURL(file);
       });
-      formData.append('files[]', JSON.stringify({
-        name: file.name,
-        data: base64.split(',')[1],
-        type: file.type
-      }));
+      fileData.push({ name: file.name, data: base64, type: file.type });
     }
 
-    const res = await fetch('https://ahmadjavan.github.io/cryptoarttest/trigger.php', {
-      method: 'POST',
-      body: formData
-    });
+    try {
+      const res = await fetch('https://api.github.com/repos/ahmadjavan/cryptoarttest/dispatches', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'Authorization': 'token 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',
+          'Content-Type': 'application/json',
+          'User-Agent': 'CryptoArtTest'
+        },
+        body: JSON.stringify({
+          event_type: "upload_gallery",
+          client_payload: { password: pass, files: fileData }
+        })
+      });
 
-    const text = await res.text();
-    if (res.ok) {
-      status.innerHTML = "<span style='color:#0f0'>درخواست با موفقیت ارسال شد!<br>برو تب Actions و نتیجه رو ببین</span>";
-    } else {
-      status.innerHTML = "<span style='color:#f66'>خطا: " + text + "</span>";
+      if (res.ok) {
+        status.innerHTML = "<span style='color:lime'>درخواست با موفقیت ارسال شد!<br>الان برو تب Actions و نتیجه رو ببین</span>";
+      } else {
+        const err = await res.text();
+        status.innerHTML = `<span style='color:red'>خطا ${res.status}<br>${err}</span>`;
+      }
+    } catch (e) {
+      status.innerHTML = "<span style='color:red'>خطا در ارتباط با سرور</span>";
     }
   }
   </script>
