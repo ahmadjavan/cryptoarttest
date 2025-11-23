@@ -3,48 +3,51 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تست کریپتوآرت - آپلود و انکریپت</title>
+  <title>تست کریپتوآرت</title>
   <style>
     body{font-family:Tahoma;background:#000;color:#0ff;padding:50px;text-align:center;}
-    input, button{padding:15px;font-size:18px;margin:10px;border-radius:12px;}
-    #result{margin-top:30px;font-size:20px;}
+    input,button{padding:15px;font-size:18px;margin:10px;border-radius:12px;}
+    #status{color:#ff0;font-size:20px;margin-top:20px;}
   </style>
 </head>
 <body>
-  <h1>تست گالری خصوصی (فقط برای احمدجوان)</h1>
-  <p>فایل(های) زیر ۱۰۰ کیلوبایت + رمز دلخواه</p>
-  
-  <input type="file" id="files" multiple><br>
-  <input type="password" id="pass" placeholder="رمز دلخواه" style="width:300px"><br>
-  <button onclick="upload()">شروع انکریپت و آپلود به Arweave</button>
-  
-  <div id="result"></div>
+  <h1>تست گالری خصوصی (فقط احمدجوان)</h1>
+  <p>فقط فایل‌های زیر ۵ مگابایت برای تست</p>
+  <input type="file" id="files" multiple accept=".jpg,.png,.mp4,.zip"><br>
+  <input type="password" id="pass" placeholder="رمز دلخواه"><br>
+  <button onclick="start()">شروع انکریپت + آپلود به Arweave</button>
+  <div id="status"></div>
 
   <script>
-  async function upload() {
+  async function start() {
     const files = document.getElementById('files').files;
     const pass = document.getElementById('pass').value;
-    if (!files.length || !pass) return alert("فایل و رمز را وارد کن");
-    
+    if(!files.length || !pass) return alert("فایل و رمز را وارد کن");
+
+    const status = document.getElementById('status');
+    status.innerHTML = "در حال ارسال به سرور...";
+
     const form = new FormData();
-    for (let file of files) form.append('files', file);
-    form.append('password', pass);
-    
-    document.getElementById('result').innerHTML = 'در حال انکریپت و آپلود...';
-    
-    const res = await fetch('https://ahmadjavan-cryptoart.vercel.app/api/upload', {
-      method: 'POST',
-      body: form
+    for(let f of files) form.append("files", f);
+    form.append("password", pass);
+
+    const res = await fetch("https://api.github.com/repos/ahmadjavan/cryptoarttest/dispatches", {
+      method: "POST",
+      headers: {
+        "Authorization": "token YOUR_TOKEN_HERE",  // تو این رو بعداً عوض می‌کنی
+        "Accept": "application/vnd.github.v3+json"
+      },
+      body: JSON.stringify({
+        event_type: "upload_gallery",
+        client_payload: { files: await Promise.all([...files].map(async f => ({
+          name: f.name,
+          content: await f.text().catch(()=>"...binary...")
+        }))), password: pass }
+      })
     });
-    const data = await res.json();
-    
-    document.getElementById('result').innerHTML = `
-      <p>گالری انکریپت‌شده (دائمی):</p>
-      <a href="${data.encrypted}" target="_blank">${data.encrypted}</a>
-      <br><br>
-      <p>لینک دیکریپتر آماده:</p>
-      <a href="https://ahmadjavan.ir/decryptor.html?tx=${data.tx}" target="_blank">باز کردن گالری خصوصی</a>
-    `;
+
+    if(res.ok) status.innerHTML = "درخواست ارسال شد! نتیجه چند دقیقه دیگه تو تلگرام یا Issues میاد";
+    else status.innerHTML = "خطا: token اشتباهه یا ریپو پرایوت";
   }
   </script>
 </body>
