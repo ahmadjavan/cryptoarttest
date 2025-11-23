@@ -1,0 +1,53 @@
+name: آپلود گالری خصوصی (دستی)
+
+on:
+  workflow_dispatch:
+    inputs:
+      password:
+        description: 'رمز دلخواه مشتری'
+        required: true
+        type: string
+      files_base64:
+        description: 'فایل‌ها به صورت JSON base64 (از فرم کپی کنید)'
+        required: true
+        type: string
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: نصب Irys
+        run: npm install -g @irys/sdk
+
+      - name: ساخت گالری و آپلود
+        env:
+          JWK: ${{ secrets.ARWEAVE_JWK }}
+          PASSWORD: ${{ inputs.password }}
+          FILES: ${{ inputs.files_base64 }}
+        run: |
+          node - << 'EOF'
+          const fs = require('fs');
+          const Irys = require('@irys/sdk');
+          const files = JSON.parse(process.env.FILES);
+          const jwk = JSON.parse(process.env.JWK);
+
+          fs.mkdirSync('gallery', { recursive: true });
+          files.forEach(f => {
+            fs.writeFileSync(`gallery/${f.name}`, Buffer.from(f.data, 'base64'));
+          });
+
+          const html = `<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>گالری خصوصی</title>
+          <style>body{background:#000;color:#0ff;text-align:center;padding:50px;font-family:Tahoma;}
+          img{max-width:90%;margin:20px;border:5px solid #0ff;border-radius:20px;}</style></head><body><h1>گالری خصوصی</h1>
+          ${files.map(f => f.type.startsWith('image/') ? `<img src="${f.name}"><br>` : '').join('')}
+          <p><strong>رمز: ${process.env.PASSWORD}</strong></p></body></html>`;
+          fs.writeFileSync('gallery/index.html', html);
+
+          (async () => {
+            const irys = new Irys({ url: "https://node2.irys.xyz", token: "arweave", key: jwk });
+            const receipt = await irys.uploadFolder('gallery', { indexFile: "index.html" });
+            console.log("آپلود شد!");
+            console.log("لینک دائمی: https://arweave.net/" + receipt.id);
+            console.log("لینک سریع: https://gateway.irys.xyz/" + receipt.id);
+          })().catch(e => console.error(e));
+          EOF
