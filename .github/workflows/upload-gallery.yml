@@ -1,0 +1,73 @@
+name: آپلود گالری خصوصی به Arweave
+
+on:
+  repository_dispatch:
+    types: [upload_gallery]
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: چک‌اوت کد
+        uses: actions/checkout@v4
+
+      - name: نصب Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: نصب پکیج‌ها
+        run: npm install @irys/sdk crypto-js
+
+      - name: دانلود و دیکریپت فایل‌ها + آپلود به Arweave
+        env:
+          JWK: ${{ secrets.ARWEAVE_JWK }}          # کیف پول Arweave خودت
+          PASSWORD: ${{ github.event.client_payload.password }}
+        run: |
+          node - << 'SCRIPT'
+          const fs = require('fs');
+          const path = require('path');
+          const CryptoJS = require('crypto-js');
+          const Irys = require('@irys/sdk');
+
+          // دریافت payload
+          const payload = ${{ toJSON(github.event.client_payload) }};
+          const files = payload.files || [];
+          const password = process.env.PASSWORD;
+
+          if (!files.length || !password) {
+            console.log("هیچ فایلی یا رمزی ارسال نشده");
+            process.exit(1);
+          }
+
+          // ساخت پوشه موقت
+          fs.mkdirSync("temp_gallery", { recursive: true });
+
+          // دیکریپت و ذخیره فایل‌ها (در این نسخه ساده فقط ذخیره می‌کنیم، بعداً انکریپت می‌کنیم)
+          files.forEach((file, i) => {
+            const bytes = CryptoJS.AES.decrypt(file.data, password);
+            const original = bytes.toString(CryptoJS.enc.Utf8);
+            if (!original) return; // رمز اشتباه بود
+            const buffer = Buffer.from(original, 'base64');
+            fs.writeFileSync(`temp_gallery/${file.name}`, buffer);
+          });
+
+          // آپلود به Arweave با Irys
+          const jwk = JSON.parse(process.env.JWK);
+          const irys = new Irys({ url: "https://node2.irys.xyz", token: "arweave", key: jwk });
+
+          console.log("در حال آپلود گالری به Arweave...");
+          const receipt = await irys.uploadFolder("temp_gallery", {
+            indexFile: "index.html"
+          });
+
+          console.log("آپلود با موفقیت انجام شد!");
+          console.log(`لینک دائمی گالری: https://arweave.net/${receipt.id}`);
+          console.log(`لینک سریع: https://gateway.irys.xyz/${receipt.id}`);
+          SCRIPT
+
+      - name: نمایش نتیجه
+        if: success()
+        run: |
+          echo "گالری با موفقیت روی Arweave آپلود شد!" >> $GITHUB_STEP_SUMMARY
