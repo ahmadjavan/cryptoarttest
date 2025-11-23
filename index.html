@@ -3,84 +3,74 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تست آپلود گالری خصوصی</title>
+  <title>آپلود گالری خصوصی</title>
   <style>
-    body{font-family:Tahoma;background:#000;color:#0ff;padding:50px;text-align:center;}
-    input,button{padding:15px;font-size:18px;margin:10px;border-radius:12px;border:none;}
-    button{background:#0066ff;color:#fff;cursor:pointer;}
-    #status{color:#ff0;font-size:22px;margin-top:30px;min-height:50px;}
-    .result{color:#0f0;font-size:20px;margin-top:20px;}
+    body{background:#111;color:#0ff;font-family:Tahoma;text-align:center;padding:50px;}
+    input,button{padding:15px 20px;margin:10px;font-size:18px;border-radius:10px;}
+    button{background:#0066ff;color:white;cursor:pointer;}
+    #status{color:#ff0;font-size:22px;margin-top:30px;}
   </style>
 </head>
 <body>
-  <h1>تست آپلود گالری خصوصی به Arweave</h1>
-  <p>فقط فایل‌های زیر ۱۰ مگابایت برای تست</p>
+  <h1>آپلود گالری خصوصی به Arweave</h1>
+  <p>فایل‌ها + رمز → گالری دائمی و رمزدار</p>
   
-  <input type="file" id="files" multiple><br>
-  <input type="password" id="pass" placeholder="رمز دلخواه" style="width:300px"><br>
-  <button onclick="upload()">آپلود و انکریپت خودکار</button>
+  <input type="file" id="files" multiple accept="image/*"><br>
+  <input type="password" id="pass" placeholder="رمز دلخواه"><br>
+  <button onclick="upload()">آپلود کن</button>
   
   <div id="status">در انتظار آپلود...</div>
-  <div id="result"></div>
 
   <script>
   async function upload() {
     const files = document.getElementById('files').files;
-    const pass = document.getElementById('pass').value.trim();
+    const pass = document.getElementById('pass').value;
     const status = document.getElementById('status');
-    const result = document.getElementById('result');
-
-    if (!files.length || !pass) {
-      status.innerHTML = '<span style="color:#f66">فایل و رمز را وارد کنید!</span>';
+    
+    if (!files.length || pass.length < 4) {
+      status.innerHTML = "فایل و رمز رو درست وارد کن!";
       return;
     }
 
-    status.innerHTML = 'در حال ارسال درخواست به سرور...';
-    result.innerHTML = '';
-
-    // تبدیل فایل‌ها به Base64 (برای تست زیر ۱۰ مگابایت کافیه)
-    const fileData = [];
-    for (let file of files) {
-      const base64 = await fileToBase64(file);
-      fileData.push({ name: file.name, data: base64.split(',')[1], type: file.type });
-    }
+    status.innerHTML = "در حال ارسال...";
 
     const payload = {
       event_type: "upload_gallery",
       client_payload: {
         password: pass,
-        files: fileData
+        files: []
       }
     };
 
-    try {
-      const res = await fetch('https://api.github.com/repos/ahmadjavan/cryptoarttest/dispatches', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'token ${{ secrets.GH_TRIGGER_TOKEN }}',  // این در کلاینت کار نمی‌کنه! فقط در سرور
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-          'X-GitHub-Api-Version': '2022-11-28'
-        },
-        body: JSON.stringify(payload)
+    for (let file of files) {
+      const base64 = await fileToBase64(file);
+      payload.client_payload.files.push({
+        name: file.name,
+        data: base64.split(',')[1]  // فقط دیتای base64
       });
+    }
 
-      if (res.ok) {
-        status.innerHTML = 'درخواست با موفقیت ارسال شد!<br>چند ثانیه دیگه گالری روی Arweave آپلود می‌شه...';
-        result.innerHTML = 'نتیجه در تب Actions → آخرین ران → لاگ‌ها ظاهر می‌شه';
-      } else {
-        status.innerHTML = '<span style="color:#f66">خطا در ارسال درخواست</span>';
-      }
-    } catch (e) {
-      status.innerHTML = '<span style="color:#f66">خطا: ' + e.message + '</span>';
+    const res = await fetch('https://api.github.com/repos/ahmadjavan/cryptoarttest/dispatches', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'token ${{ secrets.GH_TRIGGER_TOKEN }}',
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      status.innerHTML = "درخواست ارسال شد! برو تب Actions و نتیجه رو ببین";
+    } else {
+      status.innerHTML = "خطا در ارسال!";
     }
   }
 
   function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   }
