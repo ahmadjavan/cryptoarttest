@@ -1,0 +1,66 @@
+name: آپلود گالری خصوصی به Arweave
+
+on:
+  repository_dispatch:
+    types: [upload_gallery]
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: چک‌اوت
+        uses: actions/checkout@v4
+
+      - name: نصب Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: نصب Irys SDK
+        run: npm install -g @irys/sdk
+
+      - name: ساخت گالری و آپلود
+        env:
+          IRYS_KEY: ${{ secrets.ARWEAVE_JWK }}   # کیف پول Arweave خودت
+          PASSWORD: ${{ github.event.client_payload.password }}
+          FILES_JSON: ${{ toJSON(github.event.client_payload.files) }}
+        run: |
+          node - << 'EOF'
+          const fs = require('fs');
+          const Irys = require('@irys/sdk');
+
+          const files = JSON.parse(process.env.FILES_JSON);
+          const jwk = JSON.parse(process.env.IRYS_KEY);
+
+          fs.mkdirSync('gallery', { recursive: true });
+          files.forEach(f => {
+            fs.writeFileSync(`gallery/${f.name}`, Buffer.from(f.data, 'base64'));
+          });
+
+          // ساخت index.html زیبا
+          let imgs = files
+            .filter(f => f.type.startsWith('image/'))
+            .map(f => `<img src="${f.name}" style="max-width:90%;margin:20px;border-radius:20px;box-shadow:0 0 20px #0ff;">`)
+            .join('<br>');
+
+          const html = `<!DOCTYPE html>
+          <html dir="rtl" lang="fa"><head><meta charset="utf-8">
+          <title>گالری خصوصی</title>
+          <style>body{background:#000;color:#0ff;text-align:center;padding:50px;font-family:Tahoma;}
+          img{max-width:90%;margin:30px;border:5px solid #0ff;border-radius:20px;}</style>
+          </head><body><h1>گالری خصوصی شما</h1>${imgs}
+          <p><strong>رمز: ${process.env.PASSWORD}</strong></p></body></html>`;
+
+          fs.writeFileSync('gallery/index.html', html);
+
+          // آپلود با Irys
+          const irys = new Irys({ url: "https://node2.irys.xyz", token: "arweave", key: jwk });
+          const receipt = await irys.uploadFolder('gallery', { indexFile: "index.html" });
+
+          console.log("آپلود با موفقیت انجام شد!");
+          console.log(`لینک دائمی گالری: https://arweave.net/${receipt.id}`);
+          console.log(`لینک سریع: https://gateway.irys.xyz/${receipt.id}`);
+          EOF
+
+      - name: پایان
+        run: echo "تموم شد!"
