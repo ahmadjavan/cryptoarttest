@@ -1,0 +1,22 @@
+name: Trigger از صفحه وب (امن)
+
+on:
+  workflow_dispatch:
+    inputs:
+      password:
+        required: true
+      files:
+        required: true
+
+jobs:
+  forward:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Forward به workflow اصلی
+        run: |
+          gh workflow run "ساخت و آپلود گالری خصوصی به Arweave" \
+            --ref main \
+            -f password="${{ inputs.password }}" \
+            -f files="${{ inputs.files }}"
+        env:
+          GH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
