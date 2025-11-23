@@ -1,49 +1,47 @@
-name: آپلود و انکریپت به Arweave
+name: آپلود گالری به Arweave
 
 on:
-  workflow_dispatch:
+  repository_dispatch:
+    types: [upload_gallery]
 
 jobs:
-  test-upload:
+  encrypt-and-upload:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: نصب Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install packages
-        run: npm init -y && npm install arweave crypto-js
+      - name: نصب Arweave
+        run: npm install arweave crypto-js
 
-      - name: Run upload
+      - name: اسکریپت انکریپت و آپلود
         env:
-          WALLET: ${{ secrets.ARWEAVE_WALLET }}
+          ARWEAVE_KEY: ${{ secrets.ARWEAVE_KEY }}   # کیف‌پول من که AR داره
         run: |
-          node - << 'EOF'
+          node - <<'EOF'
           const Arweave = require('arweave');
           const CryptoJS = require('crypto-js');
+          const fs = require('fs');
 
-          const arweave = Arweave.init({ host: 'arweave.net', port: 443, protocol: 'https' });
-          const wallet = JSON.parse(process.env.WALLET);
+          const arweave = Arweave.init({host: 'arweave.net', port: 443, protocol: 'https'});
+          const key = JSON.parse(process.env.ARWEAVE_KEY);
 
-          const html = `<!DOCTYPE html><html dir="rtl"><body style="background:#000;color:#0ff;text-align:center;padding:100px;font-family:Tahoma;font-size:40px;"><h1>تست موفق احمدجوان!</h1><p>رمز برای باز کردن: 1234</p></body></html>`;
-
-          const encrypted = CryptoJS.AES.encrypt(html, "1234").toString();
+          // اینجا بعداً فایل‌ها از payload میان (برای تست ساده یه HTML می‌سازیم)
+          const password = "1234";
+          const html = `<!DOCTYPE html><html><body><h1>تست موفق! رمز: ${password}</h1></body></html>`;
+          const encrypted = CryptoJS.AES.encrypt(html, password).toString();
 
           (async () => {
-            const tx = await arweave.createTransaction({ data: encrypted }, wallet);
-            await arweave.transactions.sign(tx, wallet);
-            const result = await arweave.transactions.post(tx);
-            if (result.status === 200) {
-              console.log("لینک گالری انکریپت‌شده:");
-              console.log("https://arweave.net/" + tx.id);
-              console.log("لینک دیکریپتر:");
-              console.log("https://ahmadjavan.ir/decryptor.html?tx=" + tx.id);
-            } else {
-              console.log("خطا در آپلود");
-            }
+            const tx = await arweave.createTransaction({data: encrypted}, key);
+            tx.addTag('App', 'CryptoArt-Test');
+            await arweave.transactions.sign(tx, key);
+            await arweave.transactions.post(tx);
+            console.log("لینک انکریپت‌شده: https://arweave.net/" + tx.id);
+            console.log("لینک دیکریپتر: https://ahmadjavan.ir/decryptor.html?tx=" + tx.id);
           })();
           EOF
